@@ -48,6 +48,18 @@ module.exports = {
         ],
       },
     },
+    {
+      resolve: `gatsby-source-graphql`,
+      options: {
+        url: `https://dev-gatsby-source-wordpress-v4.pantheonsite.io/graphql`,
+        fieldName: `cms`,
+        typeName: `CMS`,
+        batch: true,
+        // dataLoaderOptions: {
+        //  maxBatchSize: 10,
+        // }
+      },
+    },
     `gatsby-transformer-sharp`,
     `gatsby-plugin-sharp`,
     {

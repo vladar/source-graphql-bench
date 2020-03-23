@@ -1,48 +1,68 @@
 const path = require(`path`)
 const { createFilePath } = require(`gatsby-source-filesystem`)
 
-exports.createPages = async ({ graphql, actions }) => {
+exports.createPages = async ({ graphql, actions, cache }) => {
   const { createPage } = actions
 
   const blogPost = path.resolve(`./src/templates/blog-post.js`)
-  const result = await graphql(
-    `
-      {
-        allMarkdownRemark(
-          sort: { fields: [frontmatter___date], order: DESC }
-          limit: 1000
-        ) {
-          edges {
-            node {
-              fields {
-                slug
+  const query = `
+      query ($cursor: String) {
+        cms {
+          posts(first:100 after: $cursor) {
+            edges {
+              node {
+                slug: id
               }
-              frontmatter {
-                title
-              }
+              cursor
+            }
+            pageInfo {
+              hasNextPage
             }
           }
         }
       }
     `
-  )
 
-  if (result.errors) {
-    throw result.errors
+  const CACHE_KEY = `slugs_here`
+  const slugs = await cache.get(CACHE_KEY) || []
+
+  if (!slugs.length) {
+    // Create blog posts pages.
+    let result
+    let count = 0
+    let cursor = null
+    do {
+      result = await graphql(query, { cursor })
+
+      if (result.errors) {
+        throw result.errors
+      }
+
+      const posts = result.data.cms.posts.edges
+
+      posts.forEach((post, index) => {
+        slugs.push(post.node.slug)
+        cursor = post.cursor
+        count++
+      })
+      console.log(`Fetch slugs`, count)
+    } while (result.data.cms.posts.pageInfo.hasNextPage && count < 100)
+    cache.set(CACHE_KEY, slugs)
+  } else {
+    console.log(`Slugs from cache: `, slugs.length)
   }
 
-  // Create blog posts pages.
-  const posts = result.data.allMarkdownRemark.edges
+  console.log(`unique slugs: `, [... new Set(slugs) ].length)
 
-  posts.forEach((post, index) => {
-    const previous = index === posts.length - 1 ? null : posts[index + 1].node
-    const next = index === 0 ? null : posts[index - 1].node
+  slugs.forEach((slug, index) => {
+    const previous = index === slugs.length - 1 ? null : slugs[index + 1]
+    const next = index === 0 ? null : slugs[index - 1]
 
     createPage({
-      path: post.node.fields.slug,
+      path: slug,
       component: blogPost,
       context: {
-        slug: post.node.fields.slug,
+        slug,
         previous,
         next,
       },
